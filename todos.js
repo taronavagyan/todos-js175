@@ -3,6 +3,7 @@ const morgan = require("morgan");
 const flash = require("express-flash");
 const session = require("express-session");
 const { body, validationResult } = require("express-validator");
+const { sortTodoLists, sortTodos } = require("./lib/sort");
 const TodoList = require("./lib/todolist");
 
 const app = express();
@@ -11,25 +12,8 @@ const port = 3000;
 
 let todoLists = require("./lib/seed-data");
 
-const compareByTitle = (todoListA, todoListB) => {
-  let titleA = todoListA.title.toLowerCase();
-  let titleB = todoListB.title.toLowerCase();
-
-  if (titleA < titleB) {
-    return -1;
-  } else if (titleA > titleB) {
-    return 1;
-  } else {
-    return 0;
-  }
-};
-
-const sortTodoLists = (todoLists) => {
-  let undone = todoLists.filter((todoList) => !todoList.isDone());
-  let done = todoLists.filter((todoList) => todoList.isDone());
-  undone.sort(compareByTitle);
-  done.sort(compareByTitle);
-  return [].concat(undone, done);
+const loadTodoList = (todoListId) => {
+  return todoLists.find((list) => list.id === todoListId);
 };
 
 app.set("views", "./views");
@@ -68,6 +52,25 @@ app.get("/lists", (req, res) => {
 
 app.get("/lists/new", (req, res) => {
   res.render("new-list");
+});
+
+app.get("/lists/:todoListId", (req, res, next) => {
+  let todoListId = req.params.todoListId;
+  let todoList = loadTodoList(+todoListId);
+  if (todoList === undefined) {
+    next(new Error("Not found."));
+  } else {
+    res.render("list", {
+      todoList: todoList,
+      todos: sortTodos(todoList),
+    });
+  }
+});
+
+// Error handler
+app.use((err, req, res, _next) => {
+  console.log(err);
+  res.status(404).send(err.message);
 });
 
 // Create a new todo list
