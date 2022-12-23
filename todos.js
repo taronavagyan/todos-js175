@@ -1,5 +1,8 @@
 const express = require("express");
 const morgan = require("morgan");
+const flash = require("express-flash");
+const session = require("express-session");
+const { body, validationResult } = require("express-validator");
 const TodoList = require("./lib/todolist");
 
 const app = express();
@@ -34,6 +37,24 @@ app.set("view engine", "pug");
 
 app.use(morgan("common"));
 app.use(express.static("public"));
+app.use(express.urlencoded({ extended: false }));
+app.use(
+  session({
+    name: "launch-school-todos-session-id",
+    resave: false,
+    saveUninitialized: true,
+    secret: "this is not very secure",
+  })
+);
+
+app.use(flash());
+
+// Extract session info
+app.use((req, res, next) => {
+  res.locals.flash = req.session.flash;
+  delete req.session.flash;
+  next();
+});
 
 app.get("/", (req, res) => {
   res.redirect("/lists");
@@ -49,10 +70,33 @@ app.get("/lists/new", (req, res) => {
   res.render("new-list");
 });
 
+// Create a new todo list
 app.post("/lists", (req, res) => {
   let title = req.body.todoListTitle.trim();
-  todoLists.push(new TodoList(title));
-  res.redirect("/lists");
+  if (title.length === 0) {
+    req.flash("error", "A title was not provided.");
+    res.render("new-list", {
+      flash: req.flash(),
+    });
+  } else if (title.length > 100) {
+    req.flash("error", "List title must be between 1 and 100 characters.");
+    req.flash("error", "This is another error.");
+    req.flash("error", "Here is still another error.");
+    res.render("new-list", {
+      flash: req.flash(),
+      todoListTitle: req.body.todoListTitle,
+    });
+  } else if (todoLists.find((todoList) => todoList.title === title)) {
+    req.flash("error", "List title must be unique.");
+    res.render("new-list", {
+      flash: req.flash(),
+      todoListTitle: req.body.todoListTitle,
+    });
+  } else {
+    todoLists.push(new TodoList(title));
+    req.flash("success", "The todo list has been created.");
+    res.redirect("/lists");
+  }
 });
 
 app.listen(port, host, () => {
