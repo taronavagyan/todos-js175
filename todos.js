@@ -14,7 +14,7 @@ app.use(morgan("common"));
 app.use(express.static("public"));
 
 app.get("/", (req, res) => {
-  res.render("lists");
+  res.render("lists", { todoLists });
 });
 
 app.listen(port, host, () => {
