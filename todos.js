@@ -16,6 +16,13 @@ const loadTodoList = (todoListId) => {
   return todoLists.find((list) => list.id === todoListId);
 };
 
+const loadTodo = (todoListId, todoId) => {
+  let todoList = loadTodoList(todoListId);
+  if (!todoList) return undefined;
+
+  return todoList.todos.find((todo) => todo.id === todoId);
+};
+
 app.set("views", "./views");
 app.set("view engine", "pug");
 
@@ -67,6 +74,26 @@ app.get("/lists/:todoListId", (req, res, next) => {
   }
 });
 
+app.post("/lists/:todoListId/todos/:todoId/toggle", (req, res, next) => {
+  let { todoListId, todoId } = { ...req.params };
+  let todo = loadTodo(+todoListId, +todoId);
+
+  if (!todo) {
+    next(new Error("Not found."));
+  } else {
+    let title = todo.title;
+    if (todo.isDone()) {
+      todo.markUndone();
+      req.flash("success", `"${title}" marked as NOT done!`);
+    } else {
+      todo.markDone();
+      req.flash("success", `"${title}" marked done.`);
+    }
+  }
+
+  res.redirect(`/lists/${todoListId}`);
+});
+
 // Error handler
 app.use((err, req, res, _next) => {
   console.log(err);
@@ -104,6 +131,26 @@ app.post(
     }
   }
 );
+
+// app.post("/lists/:todoListId/todos/:todoId/toggle", (req, res, next) => {
+//   let { todoListId, todoId } = { ...req.params };
+//   let todo = loadTodoList(+todoListId, +todoId);
+
+//   if (!todo) {
+//     next(new Error("Not found."));
+//   } else {
+//     let title = todo.title;
+//     if (todo.isDone()) {
+//       todo.markUndone();
+//       req.flash("success", `"${title}" marked as NOT done!`);
+//     } else {
+//       todo.markDone();
+//       req.flash("success", `"${title}" marked done!`);
+//     }
+//   }
+
+//   res.redirect(`/lists/${todoListId}`);
+// });
 
 app.listen(port, host, () => {
   console.log(`Todos is listening on port ${port} of ${host}!`);
