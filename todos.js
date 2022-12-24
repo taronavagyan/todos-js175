@@ -189,6 +189,45 @@ app.post("/lists/:todoListId/destroy", (req, res, next) => {
   }
 });
 
+app.post(
+  "/lists/:todoListId/edit",
+  [
+    body("todoListTitle")
+      .trim()
+      .isLength({ min: 1 })
+      .withMessage("The list title is required.")
+      .isLength({ max: 100 })
+      .withMessage("List must be between 1 and 100 characters.")
+      .custom((title) => {
+        let duplicate = todoLists.find((list) => list.title === title);
+        return duplicate === undefined;
+      })
+      .withMessage("List title must be unique."),
+  ],
+  (req, res, next) => {
+    let todoListId = req.params.todoListId;
+    let todoList = loadTodoList(+todoListId);
+    if (!todoList) {
+      next(new Error("Not found."));
+    } else {
+      let errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        errors.array().forEach((message) => req.flash("error", message.msg));
+        res.render(`/lists/${todoListId}/edit`, {
+          flash: req.flash(),
+          todoListTitle: req.body.todoListTitle,
+          todoList: todoList,
+        });
+      } else {
+        let title = req.body.todoListTitle;
+        todoList.setTitle(title);
+        req.flash("success", "Todo list updated.");
+        res.redirect(`/lists/${todoListId}`);
+      }
+    }
+  }
+);
+
 // Error handler
 app.use((err, req, res, _next) => {
   console.log(err);
