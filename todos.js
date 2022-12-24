@@ -89,9 +89,29 @@ app.post("/lists/:todoListId/todos/:todoId/toggle", (req, res, next) => {
       todo.markDone();
       req.flash("success", `"${title}" marked done.`);
     }
-  }
 
-  res.redirect(`/lists/${todoListId}`);
+    res.redirect(`/lists/${todoListId}`);
+  }
+});
+
+app.post("/lists/:todoListId/todos/:todoId/destroy", (req, res, next) => {
+  let { todoListId, todoId } = { ...req.params };
+
+  let todoList = loadTodoList(+todoListId);
+
+  if (!todoList) {
+    next(new Error("Not found."));
+  } else {
+    let todo = loadTodo(+todoListId, +todoId);
+    if (!todo) {
+      next(new Error("Not found."));
+    } else {
+      let title = todo.title;
+      todoList.removeAt(todoList.findIndexOf(todo));
+      req.flash("success", `"${title}" has been deleted.`);
+      res.redirect(`/lists/${todoListId}`);
+    }
+  }
 });
 
 // Error handler
