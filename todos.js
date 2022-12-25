@@ -6,19 +6,19 @@ const { body, validationResult } = require("express-validator");
 const { sortTodoLists, sortTodos } = require("./lib/sort");
 const TodoList = require("./lib/todolist");
 const Todo = require("./lib/todo");
+const store = require("connect-loki");
 
 const app = express();
 const host = "localhost";
 const port = 3000;
+const LokiStore = store(session);
 
-let todoLists = require("./lib/seed-data");
-
-const loadTodoList = (todoListId) => {
+const loadTodoList = (todoListId, todoLists) => {
   return todoLists.find((list) => list.id === todoListId);
 };
 
-const loadTodo = (todoListId, todoId) => {
-  let todoList = loadTodoList(todoListId);
+const loadTodo = (todoListId, todoId, todoLists) => {
+  let todoList = loadTodoList(todoListId, todoLists);
   if (!todoList) return undefined;
 
   return todoList.todos.find((todo) => todo.id === todoId);
@@ -32,14 +32,33 @@ app.use(express.static("public"));
 app.use(express.urlencoded({ extended: false }));
 app.use(
   session({
+    cookie: {
+      httpOnly: true,
+      maxAge: 31 * 24 * 60 * 60 * 1000, // 31 days in milliseconds
+      path: "/",
+      secure: false,
+    },
     name: "launch-school-todos-session-id",
     resave: false,
     saveUninitialized: true,
     secret: "this is not very secure",
+    store: new LokiStore({}),
   })
 );
 
 app.use(flash());
+
+// Set up persistent session data
+app.use((req, res, next) => {
+  let todoLists = [];
+  if ("todoLists" in req.session) {
+    req.session.todoLists.forEach((todoList) => {
+      todoLists.push(TodoList.makeTodoList(todoList));
+    });
+  }
+
+  next();
+});
 
 // Extract session info
 app.use((req, res, next) => {
@@ -54,7 +73,7 @@ app.get("/", (req, res) => {
 
 app.get("/lists", (req, res) => {
   res.render("lists", {
-    todoLists: sortTodoLists(todoLists),
+    todoLists: sortTodoLists(req.session.todoLists),
   });
 });
 
@@ -64,7 +83,7 @@ app.get("/lists/new", (req, res) => {
 
 app.get("/lists/:todoListId", (req, res, next) => {
   let todoListId = req.params.todoListId;
-  let todoList = loadTodoList(+todoListId);
+  let todoList = loadTodoList(+todoListId, req.session.todoLists);
   if (todoList === undefined) {
     next(new Error("Not found."));
   } else {
@@ -77,7 +96,7 @@ app.get("/lists/:todoListId", (req, res, next) => {
 
 app.get("/lists/:todoListId/edit", (req, res, next) => {
   let todoListId = req.params.todoListId;
-  let todoList = loadTodoList(+todoListId);
+  let todoList = loadTodoList(+todoListId, req.session.todoLists);
   if (!todoList) {
     next(new Error("Not found."));
   } else {
@@ -87,7 +106,7 @@ app.get("/lists/:todoListId/edit", (req, res, next) => {
 
 app.post("/lists/:todoListId/todos/:todoId/toggle", (req, res, next) => {
   let { todoListId, todoId } = { ...req.params };
-  let todo = loadTodo(+todoListId, +todoId);
+  let todo = loadTodo(+todoListId, +todoId, req.session.todoLists);
 
   if (!todo) {
     next(new Error("Not found."));
@@ -108,12 +127,12 @@ app.post("/lists/:todoListId/todos/:todoId/toggle", (req, res, next) => {
 app.post("/lists/:todoListId/todos/:todoId/destroy", (req, res, next) => {
   let { todoListId, todoId } = { ...req.params };
 
-  let todoList = loadTodoList(+todoListId);
+  let todoList = loadTodoList(+todoListId, req.session.todoLists);
 
   if (!todoList) {
     next(new Error("Not found."));
   } else {
-    let todo = loadTodo(+todoListId, +todoId);
+    let todo = loadTodo(+todoListId, +todoId, req.session.todoLists);
     if (!todo) {
       next(new Error("Not found."));
     } else {
@@ -127,7 +146,7 @@ app.post("/lists/:todoListId/todos/:todoId/destroy", (req, res, next) => {
 
 app.post("/lists/:todoListId/complete_all", (req, res, next) => {
   let todoListId = req.params.todoListId;
-  let todoList = loadTodoList(+todoListId);
+  let todoList = loadTodoList(+todoListId, req.session.todoLists);
   if (!todoList) {
     next(new Error("Not found."));
   } else {
@@ -149,7 +168,7 @@ app.post(
   ],
   (req, res, next) => {
     let todoListId = req.params.todoListId;
-    let todoList = loadTodoList(+todoListId);
+    let todoList = loadTodoList(+todoListId, req.session.todoLists);
     if (!todoList) {
       next(new Error("Not Found."));
     } else {
@@ -174,12 +193,13 @@ app.post(
 );
 
 const findTodoListById = (id) => {
-  return todoLists.find((list) => list.id === id);
+  return req.session.todoLists.find((list) => list.id === id);
 };
 
 app.post("/lists/:todoListId/destroy", (req, res, next) => {
+  let todoLists = req.session.todoLists;
   let todoListId = req.params.todoListId;
-  let todoList = loadTodoList(+todoListId);
+  let todoList = loadTodoList(+todoListId, req.session.todoLists);
   if (!todoList) {
     next(new Error("Not found."));
   } else {
@@ -198,7 +218,8 @@ app.post(
       .withMessage("The list title is required.")
       .isLength({ max: 100 })
       .withMessage("List must be between 1 and 100 characters.")
-      .custom((title) => {
+      .custom((title, { req }) => {
+        let todoLists = req.session.todoLists;
         let duplicate = todoLists.find((list) => list.title === title);
         return duplicate === undefined;
       })
@@ -206,7 +227,7 @@ app.post(
   ],
   (req, res, next) => {
     let todoListId = req.params.todoListId;
-    let todoList = loadTodoList(+todoListId);
+    let todoList = loadTodoList(+todoListId, req.session.todoLists);
     if (!todoList) {
       next(new Error("Not found."));
     } else {
@@ -245,6 +266,7 @@ app.post(
       .isLength({ max: 100 })
       .withMessage("List must be between 1 and 100 characters.")
       .custom((title) => {
+        let todoLists = req.session.todoLists;
         let duplicate = todoLists.find((list) => list.title === title);
         return duplicate === undefined;
       })
@@ -259,7 +281,7 @@ app.post(
         todoListTitle: req.body.todoListTitle,
       });
     } else {
-      todoLists.push(new TodoList(req.body.todoListTitle));
+      req.session.todoLists.push(new TodoList(req.body.todoListTitle));
       req.flash("success", "The todo list has been created.");
       res.redirect("/lists");
     }
