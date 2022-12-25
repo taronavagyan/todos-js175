@@ -13,10 +13,15 @@ const host = "localhost";
 const port = 3000;
 const LokiStore = store(session);
 
+// Find a todo list with the indicated ID. Returns `undefined` if not found.
+// Note that `todoListId` must be numeric.
 const loadTodoList = (todoListId, todoLists) => {
-  return todoLists.find((list) => list.id === todoListId);
+  return todoLists.find((todoList) => todoList.id === todoListId);
 };
 
+// Find a todo with the indicated ID in the indicated todo list. Returns
+// `undefined` if not found. Note that both `todoListId` and `todoId` must be
+// numeric.
 const loadTodo = (todoListId, todoId, todoLists) => {
   let todoList = loadTodoList(todoListId, todoLists);
   if (!todoList) return undefined;
@@ -50,6 +55,14 @@ app.use(flash());
 
 // Set up persistent session data
 app.use((req, res, next) => {
+  if (!("todoLists" in req.session)) {
+    req.session.todoLists = [];
+  }
+
+  next();
+});
+
+app.use((req, res, next) => {
   let todoLists = [];
   if ("todoLists" in req.session) {
     req.session.todoLists.forEach((todoList) => {
@@ -71,6 +84,7 @@ app.get("/", (req, res) => {
   res.redirect("/lists");
 });
 
+// Render the list of todo lists
 app.get("/lists", (req, res) => {
   res.render("lists", {
     todoLists: sortTodoLists(req.session.todoLists),
@@ -264,8 +278,8 @@ app.post(
       .isLength({ min: 1 })
       .withMessage("The list title is required.")
       .isLength({ max: 100 })
-      .withMessage("List must be between 1 and 100 characters.")
-      .custom((title) => {
+      .withMessage("List title must be between 1 and 100 characters.")
+      .custom((title, { req }) => {
         let todoLists = req.session.todoLists;
         let duplicate = todoLists.find((list) => list.title === title);
         return duplicate === undefined;
