@@ -95,6 +95,7 @@ app.get("/lists/new", (req, res) => {
   res.render("new-list");
 });
 
+// Render individual todo list and its todos
 app.get("/lists/:todoListId", (req, res, next) => {
   let todoListId = req.params.todoListId;
   let todoList = loadTodoList(+todoListId, req.session.todoLists);
@@ -108,6 +109,7 @@ app.get("/lists/:todoListId", (req, res, next) => {
   }
 });
 
+// Render edit todo list form
 app.get("/lists/:todoListId/edit", (req, res, next) => {
   let todoListId = req.params.todoListId;
   let todoList = loadTodoList(+todoListId, req.session.todoLists);
@@ -118,6 +120,7 @@ app.get("/lists/:todoListId/edit", (req, res, next) => {
   }
 });
 
+// Toggle completion status of a todo
 app.post("/lists/:todoListId/todos/:todoId/toggle", (req, res, next) => {
   let { todoListId, todoId } = { ...req.params };
   let todo = loadTodo(+todoListId, +todoId, req.session.todoLists);
@@ -138,6 +141,7 @@ app.post("/lists/:todoListId/todos/:todoId/toggle", (req, res, next) => {
   }
 });
 
+// Delete a todo
 app.post("/lists/:todoListId/todos/:todoId/destroy", (req, res, next) => {
   let { todoListId, todoId } = { ...req.params };
 
@@ -158,6 +162,7 @@ app.post("/lists/:todoListId/todos/:todoId/destroy", (req, res, next) => {
   }
 });
 
+// Mark all todos as done
 app.post("/lists/:todoListId/complete_all", (req, res, next) => {
   let todoListId = req.params.todoListId;
   let todoList = loadTodoList(+todoListId, req.session.todoLists);
@@ -170,6 +175,7 @@ app.post("/lists/:todoListId/complete_all", (req, res, next) => {
   }
 });
 
+// Create a new todo and add it to the specified list
 app.post(
   "/lists/:todoListId/todos",
   [
@@ -210,6 +216,7 @@ const findTodoListById = (id) => {
   return req.session.todoLists.find((list) => list.id === id);
 };
 
+// Delete todo list
 app.post("/lists/:todoListId/destroy", (req, res, next) => {
   let todoLists = req.session.todoLists;
   let todoListId = req.params.todoListId;
@@ -223,6 +230,7 @@ app.post("/lists/:todoListId/destroy", (req, res, next) => {
   }
 });
 
+// Edit todo list title
 app.post(
   "/lists/:todoListId/edit",
   [
